@@ -1,6 +1,7 @@
 package echo
 
 import (
+	"github.com/AndreeJait/server-management-be/domain/entity"
 	"github.com/AndreeJait/server-management-be/port/inbound/health"
 	"github.com/AndreeJait/go-utility/v2/responsew"
 	"github.com/labstack/echo/v5"
@@ -19,3 +20,6 @@ func checkHealth(healthUC health.UseCase) func(c *echo.Context) (any, error) {
 		return responsew.Success(health, "Service is healthy"), nil
 	}
 }
+
+// swag needs the entity package imported to resolve entity.Health
+var _ = entity.Health{}
