@@ -11,14 +11,8 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Install swag for swagger doc generation
-RUN go install github.com/swaggo/swag/cmd/swag@latest
-
-# Copy source code
+# Copy source code (docs/ must be pre-generated before docker build)
 COPY . .
-
-# Generate swagger docs
-RUN /go/bin/swag init -g cmd/http/main.go -o ./docs --parseDependency --parseInternal --exclude vendor
 
 # Build the binaries
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bin/server ./cmd/http
