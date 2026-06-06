@@ -1,38 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/" && pwd)"
 cd "$APP_DIR"
+
+echo "current ${APP_DIR}"
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 REGISTRY_ENV="/home/andree/docker/.env"
-COMPOSE_FILE="$APP_DIR/deploy/docker-compose.yaml"
+COMPOSE_FILE="/home/andree/docker/server-management-be/docker-compose.yaml"
 IMAGE="ghcr.io/andreejait/server-management-be"
 CONTAINER="server-management-be"
 TAG="${1:-latest}"
 
 echo "[deploy] Deploying ${IMAGE}:${TAG}"
-
-# ── Helpers ────────────────────────────────────────────────────────────────────
-wait_for_container() {
-  local container=$1
-  local max_wait=${2:-60}
-  local waited=0
-  echo "[deploy] Waiting for ${container} to be running..."
-  while [ $waited -lt $max_wait ]; do
-    local status
-    status=$(docker inspect -f '{{.State.Status}}' "${container}" 2>/dev/null || echo "missing")
-    if [ "$status" = "running" ]; then
-      echo "[deploy] ${container} is running."
-      return 0
-    fi
-    echo "[deploy] ${container} status: ${status}, waiting..."
-    sleep 2
-    waited=$((waited + 2))
-  done
-  echo "[deploy] ERROR: ${container} did not become ready within ${max_wait}s."
-  return 1
-}
 
 # ── Load registry credentials ─────────────────────────────────────────────────
 if [ ! -f "$REGISTRY_ENV" ]; then
@@ -60,23 +41,13 @@ docker compose -f "$COMPOSE_FILE" pull
 echo "[deploy] Starting containers..."
 docker compose -f "$COMPOSE_FILE" up -d --build
 
-# ── Wait for app container to be ready ─────────────────────────────────────────
-wait_for_container "$CONTAINER"
+# ── Wait for app to be ready ──────────────────────────────────────────────────
+echo "[deploy] Waiting for containers to start..."
+sleep 3
 
 # ── Run migrations ────────────────────────────────────────────────────────────
 echo "[deploy] Running migrations..."
-retry=0
-max_retries=5
-until docker compose -f "$COMPOSE_FILE" exec "$CONTAINER" /app/migrate up 2>&1; do
-  retry=$((retry + 1))
-  if [ $retry -ge $max_retries ]; then
-    echo "[deploy] ERROR: migration failed after ${max_retries} attempts."
-    exit 1
-  fi
-  delay=$((retry * 3))
-  echo "[deploy] migration attempt ${retry}/${max_retries} failed, retrying in ${delay}s..."
-  sleep $delay
-done
+docker compose -f "$COMPOSE_FILE" exec "$CONTAINER" /app/migrate up
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 echo "[deploy] Cleaning up old images..."

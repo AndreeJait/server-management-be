@@ -88,11 +88,21 @@ func newRouter(
 		corsOrigins = []string{"http://localhost:3000"}
 	}
 
+	// * origin with AllowCredentials is rejected by browsers and panics in Echo.
+	// When using wildcard, disable credentials.
+	allowCredentials := true
+	for _, o := range corsOrigins {
+		if o == "*" {
+			allowCredentials = false
+			break
+		}
+	}
+
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins:     corsOrigins,
 		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		AllowCredentials: true,
+		AllowCredentials: allowCredentials,
 	}))
 
 	echoAdapter.RegisterRoutes(e, healthUC, authUC, userUC, roleUC, projectUC, appUC, registryUC, deployUC, appFileUC, cfUC, bindingUC, proxyUC, authenticator, rbac)

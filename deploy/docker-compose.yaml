@@ -17,19 +17,6 @@ services:
       redis:
         condition: service_healthy
 
-  migrate:
-    image: ghcr.io/andreejait/server-management-be:latest
-    container_name: server-management-migrate
-    entrypoint: ["/app/migrate"]
-    command: ["up"]
-    environment:
-      - APP_ENV=production
-    volumes:
-      - ../files/config/app.yaml:/app/files/config/app.yaml:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-
   postgres:
     image: postgres:17-alpine
     container_name: server-management-postgres
