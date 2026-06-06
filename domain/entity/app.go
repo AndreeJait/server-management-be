@@ -61,7 +61,7 @@ type App struct {
 	EnvVars             StringMap       `gorm:"type:jsonb;not null;default:'{}'" json:"env_vars,omitempty"`
 	VolumeMounts        VolumeMountList `gorm:"type:jsonb;not null;default:'[]'" json:"volume_mounts,omitempty"`
 	PostDeployCommands  StringList      `gorm:"type:jsonb;not null;default:'[]'" json:"post_deploy_commands,omitempty"`
-	BasePath            string          `gorm:"size:512;not null;default:'/home/user/docker'" json:"base_path,omitempty"`
+	BasePath            string          `gorm:"size:512;not null;default:''" json:"base_path,omitempty"`
 	CreatedAt           time.Time       `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt           time.Time       `gorm:"autoUpdateTime" json:"updated_at"`
 }

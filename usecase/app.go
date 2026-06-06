@@ -26,6 +26,7 @@ type appUseCase struct {
 	filesystem    outbound.Filesystem
 	cf            outbound.Cloudflare
 	proxyEngine   outbound.ProxyEngine
+	hostBase      string
 }
 
 func NewAppUseCase(
@@ -40,6 +41,7 @@ func NewAppUseCase(
 	filesystem outbound.Filesystem,
 	cf outbound.Cloudflare,
 	proxyEngine outbound.ProxyEngine,
+	hostBase string,
 ) app.UseCase {
 	return &appUseCase{
 		appRepo:       appRepo,
@@ -53,6 +55,7 @@ func NewAppUseCase(
 		filesystem:    filesystem,
 		cf:            cf,
 		proxyEngine:  proxyEngine,
+		hostBase:     hostBase,
 	}
 }
 
@@ -209,7 +212,7 @@ func (u *appUseCase) Delete(ctx context.Context, projectID uint, appID string) e
 	// 8. Remove filesystem directories
 	basePath := a.BasePath
 	if basePath == "" {
-		basePath = "/home/user/docker"
+		basePath = u.hostBase
 	}
 	_ = u.filesystem.RemoveAll(fmt.Sprintf("%s/%s/files", basePath, appIDStr))
 	_ = u.filesystem.RemoveAll(fmt.Sprintf("%s/%s", basePath, appIDStr))

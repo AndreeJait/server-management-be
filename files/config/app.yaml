@@ -46,6 +46,7 @@ auth:
 docker:
   host: "unix:///var/run/docker.sock"
   network: ""  # Docker network to join containers to (empty = default bridge)
+  host_base: "/home/andree/docker/app-server"  # Base directory on host for app files and data
 
 cloudflare:
   api_token: ""

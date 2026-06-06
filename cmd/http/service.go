@@ -114,8 +114,9 @@ func newAppUseCase(
 	filesystem portOutbound.Filesystem,
 	cf portOutbound.Cloudflare,
 	proxyEngine portOutbound.ProxyEngine,
+	cfg *config.AppConfig,
 ) app.UseCase {
-	return usecase.NewAppUseCase(appRepo, projectRepo, deployRepo, stepRepo, bindingRepo, appFileRepo, proxyStateRepo, dockerEngine, filesystem, cf, proxyEngine)
+	return usecase.NewAppUseCase(appRepo, projectRepo, deployRepo, stepRepo, bindingRepo, appFileRepo, proxyStateRepo, dockerEngine, filesystem, cf, proxyEngine, cfg.Docker.HostBase)
 }
 
 func newRegistryUseCase(credRepo portOutbound.RegistryCredentialRepository) registry.UseCase {
@@ -143,7 +144,7 @@ func newDeploymentUseCase(
 	proxyUC proxyInbound.UseCase,
 	cfg *config.AppConfig,
 ) deployment.UseCase {
-	return usecase.NewDeploymentUseCase(appRepo, projectRepo, deployRepo, stepRepo, credRepo, dockerEngine, appFileRepo, filesystem, bindingRepo, proxyUC, cfg.Docker.Network)
+	return usecase.NewDeploymentUseCase(appRepo, projectRepo, deployRepo, stepRepo, credRepo, dockerEngine, appFileRepo, filesystem, bindingRepo, proxyUC, cfg.Docker.Network, cfg.Docker.HostBase)
 }
 
 func newAppFileRepository(db *outbound.DB) portOutbound.AppFileRepository {
@@ -206,7 +207,7 @@ func newProxyUseCase(
 	proxyEngine portOutbound.ProxyEngine,
 	cfg *config.AppConfig,
 ) proxyInbound.UseCase {
-	return usecase.NewProxyUseCase(proxyStateRepo, appRepo, bindingRepo, deployRepo, stepRepo, credRepo, dockerEngine, appFileRepo, filesystem, proxyEngine, cfg.Proxy.ShiftIntervalSec, cfg.Docker.Network)
+	return usecase.NewProxyUseCase(proxyStateRepo, appRepo, bindingRepo, deployRepo, stepRepo, credRepo, dockerEngine, appFileRepo, filesystem, proxyEngine, cfg.Proxy.ShiftIntervalSec, cfg.Docker.Network, cfg.Docker.HostBase)
 }
 
 func newBindingUseCase(bindingRepo portOutbound.AppBindingRepository, appRepo portOutbound.AppRepository, cf portOutbound.Cloudflare, proxyEngine portOutbound.ProxyEngine, cfg *config.AppConfig, deployRepo portOutbound.DeploymentRepository, dockerEngine portOutbound.DockerEngine) bindingInbound.UseCase {

@@ -64,8 +64,9 @@ type AppConfig struct {
 	} `mapstructure:"auth"`
 
 	Docker struct {
-		Host    string `mapstructure:"host"`
-		Network string `mapstructure:"network"`
+		Host     string `mapstructure:"host"`
+		Network  string `mapstructure:"network"`
+		HostBase string `mapstructure:"host_base"`
 	} `mapstructure:"docker"`
 
 	Cloudflare struct {
@@ -127,6 +128,9 @@ func Load(configPath string) (*AppConfig, error) {
 	}
 	if cfg.Docker.Host == "" {
 		cfg.Docker.Host = "unix:///var/run/docker.sock"
+	}
+	if cfg.Docker.HostBase == "" {
+		cfg.Docker.HostBase = "/home/andree/docker/app-server"
 	}
 	if cfg.Auth.JWTSecret == "" {
 		cfg.Auth.JWTSecret = "change-me-in-production"

@@ -42,6 +42,7 @@ func NewProxyUseCase(
 	proxyEngine outbound.ProxyEngine,
 	shiftIntervalSec int,
 	dockerNetwork string,
+	hostBase string,
 ) proxy.UseCase {
 	if shiftIntervalSec <= 0 {
 		shiftIntervalSec = 30
@@ -66,6 +67,7 @@ func NewProxyUseCase(
 		StepRepo:      stepRepo,
 		DeployRepo:    deployRepo,
 		DockerNetwork: dockerNetwork,
+		HostBase:      hostBase,
 	}
 	return uc
 }
@@ -105,7 +107,7 @@ func (u *proxyUseCase) DeployBlueGreen(ctx context.Context, appID, image, authRe
 
 	template := entity.DefaultPipelineTemplate(app.FrameworkPreset)
 	template = MergeAppConfig(template, app)
-	template = MergeAppFiles(template, app)
+	template = MergeAppFiles(template, app, u.executor.HostBase)
 
 	steps := make([]*entity.PipelineStep, 0, len(template.Steps))
 	for _, def := range template.Steps {

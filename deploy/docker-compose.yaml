@@ -1,0 +1,63 @@
+services:
+  server-management-be:
+    image: ghcr.io/andreejait/server-management-be:latest
+    container_name: server-management-be
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=production
+    volumes:
+      - ../files/config/app.yaml:/app/files/config/app.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /home/andree/docker/app-server:/home/andree/docker/app-server
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  migrate:
+    image: ghcr.io/andreejait/server-management-be:latest
+    container_name: server-management-migrate
+    entrypoint: ["/app/migrate"]
+    command: ["up"]
+    environment:
+      - APP_ENV=production
+    volumes:
+      - ../files/config/app.yaml:/app/files/config/app.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: server-management-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=sm
+      - POSTGRES_PASSWORD=sm_secret
+      - POSTGRES_DB=server_management
+    ports:
+      - "5432:5432"
+    volumes:
+      - /home/andree/docker/app-server/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sm -d server_management"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: server-management-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - /home/andree/docker/app-server/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

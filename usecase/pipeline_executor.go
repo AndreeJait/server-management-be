@@ -21,6 +21,7 @@ type PipelineExecutor struct {
 	StepRepo      outbound.PipelineStepRepository
 	DeployRepo    outbound.DeploymentRepository
 	DockerNetwork string
+	HostBase      string
 }
 
 func (e *PipelineExecutor) ExecuteStep(ctx context.Context, step *entity.PipelineStep, d *entity.Deployment, appID, image, authRegistry, authUser, authPass string, containerID *string, containerName *string, labels map[string]string, containerNameOverride string) error {
@@ -348,10 +349,13 @@ func MergeAppConfig(template *entity.PipelineTemplateDefinition, app *entity.App
 	return &merged
 }
 
-func MergeAppFiles(template *entity.PipelineTemplateDefinition, app *entity.App) *entity.PipelineTemplateDefinition {
+func MergeAppFiles(template *entity.PipelineTemplateDefinition, app *entity.App, hostBase string) *entity.PipelineTemplateDefinition {
 	merged := *template
 
-	hostBase := "/home/user/docker/" + app.AppID + "/files"
+	if hostBase == "" {
+		hostBase = "/home/user/docker"
+	}
+	hostBase = hostBase + "/" + app.AppID + "/files"
 	writeFilesConfig := fmt.Sprintf(`{"app_id":%q,"host_base":%q}`, app.AppID, hostBase)
 
 	createIdx := -1

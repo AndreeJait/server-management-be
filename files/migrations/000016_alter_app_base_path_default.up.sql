@@ -1,0 +1,1 @@
+ALTER TABLE apps ALTER COLUMN base_path SET DEFAULT '';
