@@ -25,8 +25,7 @@ vendor/
 # Local config overrides
 files/config/app.local.yaml
 
-# Generated (CI generates these before build)
-docs/
+# Generated docs — must be included (CI generates before build)
 
 # Claude Code
 .claude/
