@@ -1,0 +1,3 @@
+ALTER TABLE apps DROP COLUMN IF EXISTS container_port;
+ALTER TABLE apps DROP COLUMN IF EXISTS publish_port;
+ALTER TABLE apps DROP COLUMN IF EXISTS container_name;

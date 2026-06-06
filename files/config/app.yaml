@@ -1,0 +1,59 @@
+app:
+  name: server-management-be
+  host: localhost
+  env: development
+  http_port: 8080
+
+http:
+  swagger_host: ""           # Override for swagger UI host (e.g. "myapp.example.com"). Falls back to app.host:app.http_port when empty.
+  swagger_schemes: []        # Override for swagger UI schemes (e.g. ["https"]). Defaults to ["http"] when empty.
+  enable_swagger: true
+  debug_mode: true
+  cors_origins:              # Allowed origins for CORS. Defaults to ["http://localhost:3000"] when empty.
+    - "http://localhost:3000"
+
+log:
+  level: debug
+  format: JSON
+  write_to_file: false
+  file_path: ""
+
+db:
+  driver: gorm          # gorm | sqlx
+  dialect: postgres
+  dsn: "postgres://testing:testing@localhost:5432/go_hex_boilerplate?sslmode=disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+  debug_mode: false
+
+redis:
+  address: "localhost:6379"
+  password: "testing"
+  db: 0
+  pool_size: 10
+  debug_mode: false
+
+graceful:
+  shutdown_timeout: 10s
+
+auth:
+  jwt_secret: "change-me-in-production"
+  jwt_ttl: 24h
+  admin_email: "admin@server-management.local"
+  admin_password: "admin123"
+
+docker:
+  host: "unix:///var/run/docker.sock"
+  network: ""  # Docker network to join containers to (empty = default bridge)
+
+cloudflare:
+  api_token: ""
+  account_id: ""
+
+proxy:
+  enabled: true
+  health_check_path: "/health"
+  shift_interval_sec: 30
+  tunnel_service_url: "http://localhost:8080"  # URL for Cloudflare tunnel ingress rules (tunnel routes to BE, BE proxies to containers)
+  rate_limit_rps: 0  # Per-domain rate limit for proxied requests (0 = disabled)

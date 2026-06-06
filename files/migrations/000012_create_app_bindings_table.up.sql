@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS app_bindings (
+    id BIGSERIAL PRIMARY KEY,
+    app_id VARCHAR(36) NOT NULL REFERENCES apps(app_id) ON DELETE CASCADE,
+    zone_id VARCHAR(255) NOT NULL,
+    dns_record_id VARCHAR(255) NOT NULL,
+    domain VARCHAR(512) NOT NULL,
+    tunnel_id VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_bindings_app_id ON app_bindings(app_id);
