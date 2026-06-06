@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+bin/
+build/
+vendor/
+*.exe
+*.test
+*.out
+*.prof
+
+# Local config overrides
+files/config/app.local.yaml
+
+# Generated (CI generates these before build)
+docs/
+
+# Claude Code
+.claude/
+CLAUDE.md
