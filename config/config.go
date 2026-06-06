@@ -56,6 +56,12 @@ type AppConfig struct {
 		ShutdownTimeout time.Duration `mapstructure:"shutdown_timeout"`
 	} `mapstructure:"graceful"`
 
+	Retry struct {
+		MaxAttempts int           `mapstructure:"max_attempts"`
+		Interval    time.Duration `mapstructure:"interval"`
+		MaxInterval time.Duration `mapstructure:"max_interval"`
+	} `mapstructure:"retry"`
+
 	Auth struct {
 		JWTSecret     string        `mapstructure:"jwt_secret"`
 		JWTTTL       time.Duration `mapstructure:"jwt_ttl"`
@@ -146,6 +152,15 @@ func Load(configPath string) (*AppConfig, error) {
 	}
 	if cfg.Proxy.TunnelServiceURL == "" {
 		cfg.Proxy.TunnelServiceURL = fmt.Sprintf("http://localhost:%d", cfg.App.HTTPPort)
+	}
+	if cfg.Retry.MaxAttempts == 0 {
+		cfg.Retry.MaxAttempts = 10
+	}
+	if cfg.Retry.Interval == 0 {
+		cfg.Retry.Interval = 2 * time.Second
+	}
+	if cfg.Retry.MaxInterval == 0 {
+		cfg.Retry.MaxInterval = 30 * time.Second
 	}
 
 	return cfg, nil

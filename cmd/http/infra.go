@@ -7,6 +7,7 @@ import (
 	"github.com/AndreeJait/server-management-be/adapter/outbound"
 	"github.com/AndreeJait/server-management-be/config"
 	portOutbound "github.com/AndreeJait/server-management-be/port/outbound"
+	"github.com/AndreeJait/server-management-be/pkg/retry"
 	"github.com/AndreeJait/server-management-be/usecase"
 	"github.com/AndreeJait/go-utility/v2/authw"
 	"github.com/AndreeJait/go-utility/v2/jwtw"
@@ -30,7 +31,17 @@ func provideInfrastructure(c *dig.Container) {
 }
 
 func newDB(cfg *config.AppConfig, cc *CleanupCollector) (*outbound.DB, error) {
-	db, cleanup, err := outbound.ConnectSQL(context.Background(), cfg)
+	var db *outbound.DB
+	var cleanup func(ctx context.Context) error
+	err := retry.Do(context.Background(), retry.Config{
+		MaxAttempts: cfg.Retry.MaxAttempts,
+		Interval:    cfg.Retry.Interval,
+		MaxInterval: cfg.Retry.MaxInterval,
+	}, func() error {
+		var connErr error
+		db, cleanup, connErr = outbound.ConnectSQL(context.Background(), cfg)
+		return connErr
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +54,17 @@ func newGormDB(db *outbound.DB) *gorm.DB {
 }
 
 func newRedisConn(cfg *config.AppConfig, cc *CleanupCollector) (*outbound.RedisConn, error) {
-	conn, cleanup, err := outbound.ConnectRedis(context.Background(), cfg)
+	var conn *outbound.RedisConn
+	var cleanup func(ctx context.Context) error
+	err := retry.Do(context.Background(), retry.Config{
+		MaxAttempts: cfg.Retry.MaxAttempts,
+		Interval:    cfg.Retry.Interval,
+		MaxInterval: cfg.Retry.MaxInterval,
+	}, func() error {
+		var connErr error
+		conn, cleanup, connErr = outbound.ConnectRedis(context.Background(), cfg)
+		return connErr
+	})
 	if err != nil {
 		return nil, err
 	}

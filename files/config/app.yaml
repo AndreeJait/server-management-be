@@ -58,3 +58,8 @@ proxy:
   shift_interval_sec: 30
   tunnel_service_url: "http://localhost:8080"  # URL for Cloudflare tunnel ingress rules (tunnel routes to BE, BE proxies to containers)
   rate_limit_rps: 0  # Per-domain rate limit for proxied requests (0 = disabled)
+
+retry:
+  max_attempts: 10      # Total connection attempts before giving up
+  interval: 2s          # Initial wait between attempts (doubles each time)
+  max_interval: 30s     # Maximum wait between attempts
