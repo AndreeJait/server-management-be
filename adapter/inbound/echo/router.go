@@ -9,6 +9,7 @@ import (
 	"github.com/AndreeJait/server-management-be/port/inbound/auth"
 	bindingUC "github.com/AndreeJait/server-management-be/port/inbound/binding"
 	"github.com/AndreeJait/server-management-be/port/inbound/cloudflare"
+	configUC "github.com/AndreeJait/server-management-be/port/inbound/config"
 	"github.com/AndreeJait/server-management-be/port/inbound/deployment"
 	proxyUC "github.com/AndreeJait/server-management-be/port/inbound/proxy"
 	"github.com/AndreeJait/server-management-be/port/inbound/health"
@@ -43,6 +44,7 @@ func RegisterRoutes(
 	cfUC cloudflare.UseCase,
 	bindingUC bindingUC.UseCase,
 	proxyUC proxyUC.UseCase,
+	configUC configUC.UseCase,
 	authenticator authw.Authenticator,
 	rbac *authw.RBAC,
 ) {
@@ -91,6 +93,8 @@ func RegisterRoutes(
 	protected.POST("/projects/:id/apps/:appId/files", httpw.Bind(createAppFile(appFileUC, projectUC)))
 	protected.PUT("/projects/:id/apps/:appId/files/:fileId", httpw.Bind(updateAppFile(appFileUC, projectUC)))
 	protected.DELETE("/projects/:id/apps/:appId/files/:fileId", httpw.Bind(deleteAppFile(appFileUC, projectUC)))
+	protected.POST("/projects/:id/apps/:appId/files/upload", httpw.Bind(uploadAppFile(appFileUC, projectUC)))
+	protected.GET("/projects/:id/apps/:appId/files/:fileId/download", downloadAppFile(appFileUC, projectUC))
 
 	// Folder routes
 	protected.POST("/projects/:id/apps/:appId/folders", httpw.Bind(createFolder(appFileUC, projectUC)))
@@ -135,6 +139,16 @@ func RegisterRoutes(
 	proxyWrite := protected.Group("/proxy", rbacMiddleware(rbac, "proxy:write"))
 	proxyWrite.PUT("/state/:appId/traffic", httpw.Bind(setTraffic(proxyUC)))
 	proxyWrite.POST("/state/:appId/rollback", httpw.Bind(rollbackProxy(proxyUC)))
+
+	// Config routes — read (configs:read)
+	configRead := protected.Group("/config", rbacMiddleware(rbac, "configs:read"))
+	configRead.GET("/settings", httpw.Bind(getSettings(configUC)))
+	configRead.GET("/settings/:section", httpw.Bind(getSettingsBySection(configUC)))
+	configRead.GET("/proxy/access-stats", httpw.Bind(getDomainRequestCounts(configUC)))
+
+	// Config routes — write (configs:write)
+	configWrite := protected.Group("/config", rbacMiddleware(rbac, "configs:write"))
+	configWrite.PUT("/settings", httpw.Bind(updateSettings(configUC)))
 
 	// Admin routes — requires users:write permission
 	admin := protected.Group("/admin", rbacMiddleware(rbac, "users:write"))

@@ -1,0 +1,1 @@
+DELETE FROM settings WHERE section IN ('proxy', 'docker');

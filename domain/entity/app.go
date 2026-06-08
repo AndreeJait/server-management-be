@@ -62,6 +62,7 @@ type App struct {
 	VolumeMounts        VolumeMountList `gorm:"type:jsonb;not null;default:'[]'" json:"volume_mounts,omitempty"`
 	PostDeployCommands  StringList      `gorm:"type:jsonb;not null;default:'[]'" json:"post_deploy_commands,omitempty"`
 	BasePath            string          `gorm:"size:512;not null;default:''" json:"base_path,omitempty"`
+	FilesMountPath      string          `gorm:"size:512;not null;default:'/app/files'" json:"files_mount_path,omitempty"`
 	CreatedAt           time.Time       `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt           time.Time       `gorm:"autoUpdateTime" json:"updated_at"`
 }
@@ -94,6 +95,8 @@ type AppResponse struct {
 	VolumeMounts        VolumeMountList `json:"volume_mounts,omitempty"`
 	PostDeployCommands  StringList      `json:"post_deploy_commands,omitempty"`
 	BasePath            string          `json:"base_path,omitempty"`
+	FilesMountPath      string          `json:"files_mount_path,omitempty"`
+	DockerHostBase      string          `json:"docker_host_base,omitempty"`
 	CreatedAt           string          `json:"created_at"`
 }
 
@@ -113,6 +116,7 @@ func (a *App) ToResponse() *AppResponse {
 		VolumeMounts:       a.VolumeMounts,
 		PostDeployCommands: a.PostDeployCommands,
 		BasePath:           a.BasePath,
+		FilesMountPath:     a.FilesMountPath,
 		CreatedAt:          a.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }

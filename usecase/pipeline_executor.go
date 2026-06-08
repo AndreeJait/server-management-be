@@ -36,6 +36,10 @@ func (e *PipelineExecutor) ExecuteStep(ctx context.Context, step *entity.Pipelin
 			return fmt.Errorf("failed to load app files: %w", err)
 		}
 		for _, f := range files {
+			// Skip binary files — they're already on disk from upload
+			if f.FileType != "text" {
+				continue
+			}
 			hostPath := filepath.Join(config.HostBase, strings.TrimPrefix(f.Path, "/"))
 			dir := filepath.Dir(hostPath)
 			if err := e.Filesystem.MkdirAll(dir, 0755); err != nil {
@@ -353,10 +357,10 @@ func MergeAppFiles(template *entity.PipelineTemplateDefinition, app *entity.App,
 	merged := *template
 
 	if hostBase == "" {
-		hostBase = "/home/user/docker"
+		logw.Warningf("MergeAppFiles: hostBase is empty, files may not be written correctly")
 	}
-	hostBase = hostBase + "/" + app.AppID + "/files"
-	writeFilesConfig := fmt.Sprintf(`{"app_id":%q,"host_base":%q}`, app.AppID, hostBase)
+	hostFilesDir := hostBase + "/" + app.AppID + "/files"
+	writeFilesConfig := fmt.Sprintf(`{"app_id":%q,"host_base":%q}`, app.AppID, hostFilesDir)
 
 	createIdx := -1
 	for i, step := range merged.Steps {
@@ -379,13 +383,54 @@ func MergeAppFiles(template *entity.PipelineTemplateDefinition, app *entity.App,
 	newSteps := make([]entity.PipelineStepDefinition, 0, len(merged.Steps)+1)
 	newSteps = append(newSteps, merged.Steps[:createIdx]...)
 	newSteps = append(newSteps, writeFilesStep)
-	for _, step := range merged.Steps[createIdx:] {
+	for i, step := range merged.Steps[createIdx:] {
 		newSteps = append(newSteps, entity.PipelineStepDefinition{
 			Name:   step.Name,
 			Order:  step.Order + 1,
 			Config: step.Config,
 		})
+		// Inject auto-mount of files directory into the create_container step
+		if step.Name == "create_container" {
+			containerMountPath := app.FilesMountPath
+			if containerMountPath == "" {
+				containerMountPath = "/app/files"
+			}
+			newSteps[i+1].Config = mergeFilesVolumeMountIntoConfig(step.Config, volumeMountConfig{
+				HostPath:      hostFilesDir,
+				ContainerPath: containerMountPath,
+				Mode:          "rw",
+			})
+		}
 	}
 
 	return &entity.PipelineTemplateDefinition{Steps: newSteps}
+}
+
+func mergeFilesVolumeMountIntoConfig(configJSON string, mount volumeMountConfig) string {
+	var cfg map[string]interface{}
+	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
+		return configJSON
+	}
+	var existingMounts []interface{}
+	if raw, ok := cfg["volume_mounts"]; ok {
+		existingMounts, _ = raw.([]interface{})
+	}
+	for _, m := range existingMounts {
+		if mMap, ok := m.(map[string]interface{}); ok {
+			if mMap["container_path"] == mount.ContainerPath {
+				return configJSON
+			}
+		}
+	}
+	existingMounts = append(existingMounts, map[string]interface{}{
+		"host_path":      mount.HostPath,
+		"container_path": mount.ContainerPath,
+		"mode":           mount.Mode,
+	})
+	cfg["volume_mounts"] = existingMounts
+	result, err := json.Marshal(cfg)
+	if err != nil {
+		return configJSON
+	}
+	return string(result)
 }

@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	echoAdapter "github.com/AndreeJait/server-management-be/adapter/inbound/echo"
 	"github.com/AndreeJait/server-management-be/adapter/outbound"
 	"github.com/AndreeJait/server-management-be/config"
+	configInbound "github.com/AndreeJait/server-management-be/port/inbound/config"
 	"github.com/AndreeJait/server-management-be/port/inbound/app"
 	"github.com/AndreeJait/server-management-be/port/inbound/appfile"
 	"github.com/AndreeJait/server-management-be/port/inbound/auth"
@@ -36,6 +40,7 @@ func provideRouter(c *dig.Container) {
 func newRouter(
 	// kyan:param:start
 	cfg *config.AppConfig,
+	runtimeCfg *config.RuntimeConfig,
 	healthUC health.UseCase,
 	authUC auth.UseCase,
 	userUC user.UseCase,
@@ -48,9 +53,11 @@ func newRouter(
 	cfUC cloudflareInbound.UseCase,
 	bindingUC bindingInbound.UseCase,
 	proxyUC proxyInbound.UseCase,
+	configUC configInbound.UseCase,
 	authenticator authw.Authenticator,
 	rbac *authw.RBAC,
 	proxyEngine portOutbound.ProxyEngine,
+	domainCountRepo portOutbound.DomainRequestCountRepository,
 	// kyan:param:end
 ) (http.Handler, error) {
 	e := httpwEcho.New(&httpwEcho.Config{
@@ -59,11 +66,21 @@ func newRouter(
 	})
 
 	// Proxy middleware: intercept requests for bound domains BEFORE CORS
-	if cfg.Proxy.Enabled {
-		var rateLimiter *outbound.RateLimiter
-		if cfg.Proxy.RateLimitRPS > 0 {
-			rateLimiter = outbound.NewRateLimiter(cfg.Proxy.RateLimitRPS)
+	if runtimeCfg.GetProxyEnabled() {
+		var rateLimiter atomic.Pointer[outbound.RateLimiter]
+		if rps := runtimeCfg.GetRateLimitRPS(); rps > 0 {
+			rateLimiter.Store(outbound.NewRateLimiter(rps))
 		}
+
+		// Hot-reload: swap rate limiter when RPS config changes
+		runtimeCfg.OnRateLimitChange(func(rps int) {
+			if rps > 0 {
+				rateLimiter.Store(outbound.NewRateLimiter(rps))
+			} else {
+				rateLimiter.Store(nil)
+			}
+		})
+
 		e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 			return func(c *echo.Context) error {
 				host := c.Request().Host
@@ -72,10 +89,18 @@ func newRouter(
 				}
 				if _, ok := proxyEngine.Lookup(host); ok {
 					var handler http.Handler = proxyEngine.Handler()
-					if rateLimiter != nil {
-						handler = rateLimiter.Middleware(handler)
+					if rl := rateLimiter.Load(); rl != nil {
+						handler = rl.Middleware(handler)
 					}
 					handler.ServeHTTP(c.Response(), c.Request())
+
+					// Non-blocking domain request count increment
+					countHost := host
+					go func() {
+						ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+						defer cancel()
+						_ = domainCountRepo.Increment(ctx, countHost)
+					}()
 					return nil
 				}
 				return next(c)
@@ -105,7 +130,7 @@ func newRouter(
 		AllowCredentials: allowCredentials,
 	}))
 
-	echoAdapter.RegisterRoutes(e, healthUC, authUC, userUC, roleUC, projectUC, appUC, registryUC, deployUC, appFileUC, cfUC, bindingUC, proxyUC, authenticator, rbac)
+	echoAdapter.RegisterRoutes(e, healthUC, authUC, userUC, roleUC, projectUC, appUC, registryUC, deployUC, appFileUC, cfUC, bindingUC, proxyUC, configUC, authenticator, rbac)
 
 	return e, nil
 }

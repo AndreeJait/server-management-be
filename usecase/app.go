@@ -93,7 +93,9 @@ func (u *appUseCase) List(ctx context.Context, projectID uint) ([]*entity.AppRes
 	}
 	responses := make([]*entity.AppResponse, 0, len(apps))
 	for _, a := range apps {
-		responses = append(responses, a.ToResponse())
+		resp := a.ToResponse()
+		resp.DockerHostBase = u.hostBase
+		responses = append(responses, resp)
 	}
 	return responses, nil
 }
@@ -110,10 +112,12 @@ func (u *appUseCase) Get(ctx context.Context, projectID uint, appID string) (*en
 	if a.ProjectID != projectID {
 		return nil, domainError.ErrForbidden.WithCustomMessage("App does not belong to this project")
 	}
-	return a.ToResponse(), nil
+	resp := a.ToResponse()
+	resp.DockerHostBase = u.hostBase
+	return resp, nil
 }
 
-func (u *appUseCase) Update(ctx context.Context, projectID uint, appID string, name, frameworkPreset string, envVars entity.StringMap, volumeMounts entity.VolumeMountList, postDeployCommands entity.StringList, basePath, defaultImage, containerPort, publishPort, containerName string) (*entity.AppResponse, error) {
+func (u *appUseCase) Update(ctx context.Context, projectID uint, appID string, name, frameworkPreset string, envVars entity.StringMap, volumeMounts entity.VolumeMountList, postDeployCommands entity.StringList, basePath, defaultImage, containerPort, publishPort, containerName, filesMountPath string) (*entity.AppResponse, error) {
 	id, err := strconv.ParseUint(appID, 10, 64)
 	if err != nil {
 		return nil, domainError.ErrInvalidParam.WithCustomMessage("Invalid app ID")
@@ -141,10 +145,15 @@ func (u *appUseCase) Update(ctx context.Context, projectID uint, appID string, n
 	a.ContainerPort = containerPort
 	a.PublishPort = publishPort
 	a.ContainerName = containerName
+	if filesMountPath != "" {
+		a.FilesMountPath = filesMountPath
+	}
 	if err := u.appRepo.Update(ctx, a); err != nil {
 		return nil, domainError.ErrInternalServer.WithError(err)
 	}
-	return a.ToResponse(), nil
+	resp := a.ToResponse()
+	resp.DockerHostBase = u.hostBase
+	return resp, nil
 }
 
 func (u *appUseCase) Delete(ctx context.Context, projectID uint, appID string) error {

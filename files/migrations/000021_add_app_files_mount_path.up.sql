@@ -1,0 +1,1 @@
+ALTER TABLE apps ADD COLUMN files_mount_path VARCHAR(512) NOT NULL DEFAULT '/app/files';

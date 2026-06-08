@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS settings (
+    id         BIGSERIAL PRIMARY KEY,
+    section    VARCHAR(50) NOT NULL,
+    key        VARCHAR(100) NOT NULL,
+    value      TEXT NOT NULL,
+    type       VARCHAR(20) NOT NULL DEFAULT 'string',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(section, key)
+);

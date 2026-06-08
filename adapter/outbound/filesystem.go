@@ -20,6 +20,14 @@ func (f *osFilesystem) WriteFile(path string, data []byte, perm os.FileMode) err
 	return os.WriteFile(path, data, perm)
 }
 
+func (f *osFilesystem) ReadFile(path string) ([]byte, error) {
+	return os.ReadFile(path)
+}
+
+func (f *osFilesystem) RemoveFile(path string) error {
+	return os.Remove(path)
+}
+
 func (f *osFilesystem) RemoveAll(path string) error {
 	return os.RemoveAll(path)
 }

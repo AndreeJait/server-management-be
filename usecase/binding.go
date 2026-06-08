@@ -4,30 +4,31 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/AndreeJait/server-management-be/config"
 	"github.com/AndreeJait/server-management-be/domain/entity"
 	"github.com/AndreeJait/server-management-be/port/inbound/binding"
 	"github.com/AndreeJait/server-management-be/port/outbound"
 )
 
 type bindingUseCase struct {
-	bindingRepo      outbound.AppBindingRepository
-	appRepo          outbound.AppRepository
-	cf              outbound.Cloudflare
-	proxyEngine      outbound.ProxyEngine
-	tunnelServiceURL string
-	deployRepo       outbound.DeploymentRepository
-	dockerEngine     outbound.DockerEngine
+	bindingRepo  outbound.AppBindingRepository
+	appRepo      outbound.AppRepository
+	cf           outbound.Cloudflare
+	proxyEngine  outbound.ProxyEngine
+	runtimeCfg   *config.RuntimeConfig
+	deployRepo   outbound.DeploymentRepository
+	dockerEngine outbound.DockerEngine
 }
 
-func NewBindingUseCase(bindingRepo outbound.AppBindingRepository, appRepo outbound.AppRepository, cf outbound.Cloudflare, proxyEngine outbound.ProxyEngine, tunnelServiceURL string, deployRepo outbound.DeploymentRepository, dockerEngine outbound.DockerEngine) binding.UseCase {
+func NewBindingUseCase(bindingRepo outbound.AppBindingRepository, appRepo outbound.AppRepository, cf outbound.Cloudflare, proxyEngine outbound.ProxyEngine, runtimeCfg *config.RuntimeConfig, deployRepo outbound.DeploymentRepository, dockerEngine outbound.DockerEngine) binding.UseCase {
 	return &bindingUseCase{
-		bindingRepo:      bindingRepo,
-		appRepo:          appRepo,
-		cf:              cf,
-		proxyEngine:      proxyEngine,
-		tunnelServiceURL: tunnelServiceURL,
-		deployRepo:       deployRepo,
-		dockerEngine:     dockerEngine,
+		bindingRepo:  bindingRepo,
+		appRepo:      appRepo,
+		cf:           cf,
+		proxyEngine:  proxyEngine,
+		runtimeCfg:   runtimeCfg,
+		deployRepo:   deployRepo,
+		dockerEngine: dockerEngine,
 	}
 }
 
@@ -39,7 +40,7 @@ func (u *bindingUseCase) Create(ctx context.Context, appID, zoneID, domain, tunn
 
 	// Use the BE's tunnel service URL as default (tunnel routes to BE, BE proxies to containers)
 	if service == "" {
-		service = u.tunnelServiceURL
+		service = u.runtimeCfg.GetTunnelServiceURL()
 	}
 
 	dnsRecord, err := u.cf.CreateDNSRecord(ctx, zoneID, "CNAME", domain, tunnelID+".cfargotunnel.com", 1, true)

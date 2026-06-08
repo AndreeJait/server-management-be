@@ -20,14 +20,22 @@ type appFileUseCase struct {
 	deployRepo  outbound.DeploymentRepository
 	filesystem  outbound.Filesystem
 	deployFunc  appfile.DeployFunc
+	hostBase    string
 }
 
-func NewAppFileUseCase(appFileRepo outbound.AppFileRepository, appRepo outbound.AppRepository, deployRepo outbound.DeploymentRepository, filesystem outbound.Filesystem) appfile.UseCase {
-	return &appFileUseCase{appFileRepo: appFileRepo, appRepo: appRepo, deployRepo: deployRepo, filesystem: filesystem}
+func NewAppFileUseCase(appFileRepo outbound.AppFileRepository, appRepo outbound.AppRepository, deployRepo outbound.DeploymentRepository, filesystem outbound.Filesystem, hostBase string) appfile.UseCase {
+	return &appFileUseCase{appFileRepo: appFileRepo, appRepo: appRepo, deployRepo: deployRepo, filesystem: filesystem, hostBase: hostBase}
 }
 
 func (u *appFileUseCase) SetDeployFunc(fn appfile.DeployFunc) {
 	u.deployFunc = fn
+}
+
+func (u *appFileUseCase) effectiveHostBase(app *entity.App) string {
+	if app.BasePath != "" {
+		return app.BasePath
+	}
+	return u.hostBase
 }
 
 func (u *appFileUseCase) validateOwnership(ctx context.Context, projectID uint, appID string) (*entity.App, error) {
@@ -66,8 +74,27 @@ func (u *appFileUseCase) triggerRedeploy(ctx context.Context, appID string) {
 	}()
 }
 
+func (u *appFileUseCase) hostFilePath(app *entity.App, fileRelPath string) string {
+	return filepath.Join(u.effectiveHostBase(app), app.AppID, "files", strings.TrimPrefix(fileRelPath, "/"))
+}
+
+func (u *appFileUseCase) writeToHost(app *entity.App, f *entity.AppFile) {
+	hostPath := u.hostFilePath(app, f.Path)
+	dir := filepath.Dir(hostPath)
+	if err := u.filesystem.MkdirAll(dir, 0755); err != nil {
+		logw.Warningf("failed to create directory %s: %v", dir, err)
+		return
+	}
+	if f.FileType == "text" && f.Content != "" {
+		if err := u.filesystem.WriteFile(hostPath, []byte(f.Content), 0644); err != nil {
+			logw.Warningf("failed to write file %s: %v", hostPath, err)
+		}
+	}
+}
+
 func (u *appFileUseCase) Create(ctx context.Context, projectID uint, appID, path, content string) (*entity.AppFileResponse, error) {
-	if _, err := u.validateOwnership(ctx, projectID, appID); err != nil {
+	app, err := u.validateOwnership(ctx, projectID, appID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -75,7 +102,7 @@ func (u *appFileUseCase) Create(ctx context.Context, projectID uint, appID, path
 	if err := u.appFileRepo.Create(ctx, f); err != nil {
 		return nil, domainError.ErrInternalServer.WithError(err)
 	}
-	u.triggerRedeploy(ctx, appID)
+	u.writeToHost(app, f)
 	return f.ToResponse(), nil
 }
 
@@ -111,7 +138,8 @@ func (u *appFileUseCase) Get(ctx context.Context, projectID uint, appID string, 
 }
 
 func (u *appFileUseCase) Update(ctx context.Context, projectID uint, appID string, fileID uint, path, content string) (*entity.AppFileResponse, error) {
-	if _, err := u.validateOwnership(ctx, projectID, appID); err != nil {
+	app, err := u.validateOwnership(ctx, projectID, appID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -128,12 +156,13 @@ func (u *appFileUseCase) Update(ctx context.Context, projectID uint, appID strin
 	if err := u.appFileRepo.Update(ctx, f); err != nil {
 		return nil, domainError.ErrInternalServer.WithError(err)
 	}
-	u.triggerRedeploy(ctx, appID)
+	u.writeToHost(app, f)
 	return f.ToResponse(), nil
 }
 
 func (u *appFileUseCase) Delete(ctx context.Context, projectID uint, appID string, fileID uint) error {
-	if _, err := u.validateOwnership(ctx, projectID, appID); err != nil {
+	app, err := u.validateOwnership(ctx, projectID, appID)
+	if err != nil {
 		return err
 	}
 
@@ -145,11 +174,85 @@ func (u *appFileUseCase) Delete(ctx context.Context, projectID uint, appID strin
 		return domainError.ErrForbidden.WithCustomMessage("File does not belong to this app")
 	}
 
+	hostPath := u.hostFilePath(app, f.Path)
+	_ = u.filesystem.RemoveFile(hostPath)
+
 	if err := u.appFileRepo.Delete(ctx, fileID); err != nil {
 		return domainError.ErrInternalServer.WithError(err)
 	}
-	u.triggerRedeploy(ctx, appID)
 	return nil
+}
+
+func (u *appFileUseCase) Upload(ctx context.Context, projectID uint, appID, path string, data []byte, mimeType string, fileSize int64) (*entity.AppFileResponse, error) {
+	app, err := u.validateOwnership(ctx, projectID, appID)
+	if err != nil {
+		return nil, err
+	}
+
+	cleanPath := strings.TrimPrefix(path, "/")
+	if cleanPath == "" {
+		return nil, domainError.ErrInvalidParam.WithCustomMessage("File path is required")
+	}
+	if strings.Contains(cleanPath, "..") {
+		return nil, domainError.ErrInvalidParam.WithCustomMessage("Path traversal is not allowed")
+	}
+
+	hostPath := u.hostFilePath(app, cleanPath)
+	dir := filepath.Dir(hostPath)
+	if err := u.filesystem.MkdirAll(dir, 0755); err != nil {
+		return nil, domainError.ErrInternalServer.WithError(err)
+	}
+	if err := u.filesystem.WriteFile(hostPath, data, 0644); err != nil {
+		return nil, domainError.ErrInternalServer.WithError(err)
+	}
+
+	isText := strings.HasPrefix(mimeType, "text/") || mimeType == "application/json" || mimeType == "application/xml" || mimeType == "application/x-yaml"
+	content := ""
+	fileType := "binary"
+	if isText {
+		content = string(data)
+		fileType = "text"
+	}
+
+	f := &entity.AppFile{
+		AppID:    appID,
+		Path:     cleanPath,
+		Content:  content,
+		FileType: fileType,
+		FileSize: fileSize,
+		MimeType: mimeType,
+	}
+	if err := u.appFileRepo.Create(ctx, f); err != nil {
+		return nil, domainError.ErrInternalServer.WithError(err)
+	}
+	return f.ToResponse(), nil
+}
+
+func (u *appFileUseCase) Download(ctx context.Context, projectID uint, appID string, fileID uint) ([]byte, string, error) {
+	app, err := u.validateOwnership(ctx, projectID, appID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	f, err := u.appFileRepo.FindByID(ctx, fileID)
+	if err != nil {
+		return nil, "", domainError.ErrNotFound.WithCustomMessage("File not found")
+	}
+	if f.AppID != appID {
+		return nil, "", domainError.ErrForbidden.WithCustomMessage("File does not belong to this app")
+	}
+
+	hostPath := u.hostFilePath(app, f.Path)
+	data, err := u.filesystem.ReadFile(hostPath)
+	if err != nil {
+		return nil, "", domainError.ErrInternalServer.WithError(err)
+	}
+
+	mimeType := f.MimeType
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	return data, mimeType, nil
 }
 
 func (u *appFileUseCase) CreateFolder(ctx context.Context, projectID uint, appID, path string) (*entity.AppResponse, error) {
@@ -166,7 +269,7 @@ func (u *appFileUseCase) CreateFolder(ctx context.Context, projectID uint, appID
 		return nil, domainError.ErrInvalidParam.WithCustomMessage("Path traversal is not allowed")
 	}
 
-	hostPath := filepath.Join(app.BasePath, app.AppID, cleanPath)
+	hostPath := filepath.Join(u.effectiveHostBase(app), app.AppID, cleanPath)
 	if err := u.filesystem.MkdirAll(hostPath, 0755); err != nil {
 		return nil, domainError.ErrInternalServer.WithError(err)
 	}
@@ -200,7 +303,7 @@ func (u *appFileUseCase) DeleteFolder(ctx context.Context, projectID uint, appID
 		return domainError.ErrInvalidParam.WithCustomMessage("Path traversal is not allowed")
 	}
 
-	hostPath := filepath.Join(app.BasePath, app.AppID, cleanPath)
+	hostPath := filepath.Join(u.effectiveHostBase(app), app.AppID, cleanPath)
 	containerPath := "/" + cleanPath
 
 	if err := u.filesystem.RemoveAll(hostPath); err != nil {

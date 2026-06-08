@@ -178,6 +178,7 @@ type updateAppRequest struct {
 	ContainerPort      string                  `json:"container_port"`
 	PublishPort        string                  `json:"publish_port"`
 	ContainerName      string                  `json:"container_name"`
+	FilesMountPath     string                  `json:"files_mount_path"`
 }
 
 func updateApp(appUC app.UseCase, projectUC project.UseCase) func(c *echo.Context) (any, error) {
@@ -190,7 +191,7 @@ func updateApp(appUC app.UseCase, projectUC project.UseCase) func(c *echo.Contex
 		if err := c.Bind(&req); err != nil {
 			return nil, err
 		}
-		a, err := appUC.Update(c.Request().Context(), pid, c.Param("appId"), req.Name, req.FrameworkPreset, req.EnvVars, req.VolumeMounts, req.PostDeployCommands, req.BasePath, req.DefaultImage, req.ContainerPort, req.PublishPort, req.ContainerName)
+		a, err := appUC.Update(c.Request().Context(), pid, c.Param("appId"), req.Name, req.FrameworkPreset, req.EnvVars, req.VolumeMounts, req.PostDeployCommands, req.BasePath, req.DefaultImage, req.ContainerPort, req.PublishPort, req.ContainerName, req.FilesMountPath)
 		if err != nil {
 			return nil, err
 		}

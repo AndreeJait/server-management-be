@@ -11,6 +11,7 @@ import (
 	"github.com/AndreeJait/server-management-be/port/inbound/auth"
 	bindingInbound "github.com/AndreeJait/server-management-be/port/inbound/binding"
 	cloudflareInbound "github.com/AndreeJait/server-management-be/port/inbound/cloudflare"
+	configInbound "github.com/AndreeJait/server-management-be/port/inbound/config"
 	"github.com/AndreeJait/server-management-be/port/inbound/deployment"
 	"github.com/AndreeJait/server-management-be/port/inbound/health"
 	proxyInbound "github.com/AndreeJait/server-management-be/port/inbound/proxy"
@@ -55,6 +56,9 @@ func provideServices(c *dig.Container) {
 	c.Provide(newProxyUseCase)
 	c.Provide(newDeploymentUseCase)
 	c.Provide(newBindingUseCase)
+	c.Provide(newSettingRepository)
+	c.Provide(newDomainRequestCountRepository)
+	c.Provide(newConfigUseCase)
 	// kyan:provider:end
 }
 
@@ -114,9 +118,9 @@ func newAppUseCase(
 	filesystem portOutbound.Filesystem,
 	cf portOutbound.Cloudflare,
 	proxyEngine portOutbound.ProxyEngine,
-	cfg *config.AppConfig,
+	runtimeCfg *config.RuntimeConfig,
 ) app.UseCase {
-	return usecase.NewAppUseCase(appRepo, projectRepo, deployRepo, stepRepo, bindingRepo, appFileRepo, proxyStateRepo, dockerEngine, filesystem, cf, proxyEngine, cfg.Docker.HostBase)
+	return usecase.NewAppUseCase(appRepo, projectRepo, deployRepo, stepRepo, bindingRepo, appFileRepo, proxyStateRepo, dockerEngine, filesystem, cf, proxyEngine, runtimeCfg.GetDockerHostBase())
 }
 
 func newRegistryUseCase(credRepo portOutbound.RegistryCredentialRepository) registry.UseCase {
@@ -142,9 +146,9 @@ func newDeploymentUseCase(
 	filesystem portOutbound.Filesystem,
 	bindingRepo portOutbound.AppBindingRepository,
 	proxyUC proxyInbound.UseCase,
-	cfg *config.AppConfig,
+	runtimeCfg *config.RuntimeConfig,
 ) deployment.UseCase {
-	return usecase.NewDeploymentUseCase(appRepo, projectRepo, deployRepo, stepRepo, credRepo, dockerEngine, appFileRepo, filesystem, bindingRepo, proxyUC, cfg.Docker.Network, cfg.Docker.HostBase)
+	return usecase.NewDeploymentUseCase(appRepo, projectRepo, deployRepo, stepRepo, credRepo, dockerEngine, appFileRepo, filesystem, bindingRepo, proxyUC, runtimeCfg.GetDockerNetwork(), runtimeCfg.GetDockerHostBase())
 }
 
 func newAppFileRepository(db *outbound.DB) portOutbound.AppFileRepository {
@@ -155,8 +159,8 @@ func newFilesystem() portOutbound.Filesystem {
 	return outbound.NewFilesystem()
 }
 
-func newAppFileUseCase(appFileRepo portOutbound.AppFileRepository, appRepo portOutbound.AppRepository, deployRepo portOutbound.DeploymentRepository, filesystem portOutbound.Filesystem) appfile.UseCase {
-	uc := usecase.NewAppFileUseCase(appFileRepo, appRepo, deployRepo, filesystem)
+func newAppFileUseCase(appFileRepo portOutbound.AppFileRepository, appRepo portOutbound.AppRepository, deployRepo portOutbound.DeploymentRepository, filesystem portOutbound.Filesystem, runtimeCfg *config.RuntimeConfig) appfile.UseCase {
+	uc := usecase.NewAppFileUseCase(appFileRepo, appRepo, deployRepo, filesystem, runtimeCfg.GetDockerHostBase())
 	return uc
 }
 
@@ -205,13 +209,13 @@ func newProxyUseCase(
 	appFileRepo portOutbound.AppFileRepository,
 	filesystem portOutbound.Filesystem,
 	proxyEngine portOutbound.ProxyEngine,
-	cfg *config.AppConfig,
+	runtimeCfg *config.RuntimeConfig,
 ) proxyInbound.UseCase {
-	return usecase.NewProxyUseCase(proxyStateRepo, appRepo, bindingRepo, deployRepo, stepRepo, credRepo, dockerEngine, appFileRepo, filesystem, proxyEngine, cfg.Proxy.ShiftIntervalSec, cfg.Docker.Network, cfg.Docker.HostBase)
+	return usecase.NewProxyUseCase(proxyStateRepo, appRepo, bindingRepo, deployRepo, stepRepo, credRepo, dockerEngine, appFileRepo, filesystem, proxyEngine, runtimeCfg)
 }
 
-func newBindingUseCase(bindingRepo portOutbound.AppBindingRepository, appRepo portOutbound.AppRepository, cf portOutbound.Cloudflare, proxyEngine portOutbound.ProxyEngine, cfg *config.AppConfig, deployRepo portOutbound.DeploymentRepository, dockerEngine portOutbound.DockerEngine) bindingInbound.UseCase {
-	return usecase.NewBindingUseCase(bindingRepo, appRepo, cf, proxyEngine, cfg.Proxy.TunnelServiceURL, deployRepo, dockerEngine)
+func newBindingUseCase(bindingRepo portOutbound.AppBindingRepository, appRepo portOutbound.AppRepository, cf portOutbound.Cloudflare, proxyEngine portOutbound.ProxyEngine, runtimeCfg *config.RuntimeConfig, deployRepo portOutbound.DeploymentRepository, dockerEngine portOutbound.DockerEngine) bindingInbound.UseCase {
+	return usecase.NewBindingUseCase(bindingRepo, appRepo, cf, proxyEngine, runtimeCfg, deployRepo, dockerEngine)
 }
 
 func restoreProxyRoutes(proxyStateRepo portOutbound.ProxyStateRepository, bindingRepo portOutbound.AppBindingRepository, proxyEngine portOutbound.ProxyEngine) {
@@ -231,6 +235,18 @@ func restoreProxyRoutes(proxyStateRepo portOutbound.ProxyStateRepository, bindin
 		proxyEngine.UpdateRoute(ps.AppID, ps.BlueTarget, ps.GreenTarget, ps.TrafficPercent)
 		logw.Infof("proxy: restored route for app=%s domain=%s", ps.AppID, domain)
 	}
+}
+
+func newSettingRepository(db *outbound.DB) portOutbound.SettingRepository {
+	return outbound.NewSettingRepository(db)
+}
+
+func newDomainRequestCountRepository(db *outbound.DB) portOutbound.DomainRequestCountRepository {
+	return outbound.NewDomainRequestCountRepository(db)
+}
+
+func newConfigUseCase(settingRepo portOutbound.SettingRepository, domainCountRepo portOutbound.DomainRequestCountRepository, runtimeCfg *config.RuntimeConfig) configInbound.UseCase {
+	return usecase.NewConfigUseCase(settingRepo, domainCountRepo, runtimeCfg)
 }
 
 // kyan:service:start

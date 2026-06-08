@@ -1,0 +1,3 @@
+ALTER TABLE app_files DROP COLUMN IF EXISTS file_type;
+ALTER TABLE app_files DROP COLUMN IF EXISTS file_size;
+ALTER TABLE app_files DROP COLUMN IF EXISTS mime_type;

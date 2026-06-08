@@ -1,6 +1,10 @@
 package echo
 
 import (
+	"fmt"
+	"io"
+	"net/http"
+	"path/filepath"
 	"strconv"
 
 	"github.com/AndreeJait/server-management-be/port/inbound/app"
@@ -267,5 +271,73 @@ func deleteFolder(appFileUC appfile.UseCase, projectUC project.UseCase) func(c *
 			return nil, err
 		}
 		return responsew.Success(nil, "Folder deleted"), nil
+	}
+}
+
+// --- File upload/download handlers ---
+
+func uploadAppFile(appFileUC appfile.UseCase, projectUC project.UseCase) func(c *echo.Context) (any, error) {
+	return func(c *echo.Context) (any, error) {
+		pid, err := validateProjectOwnership(c, projectUC)
+		if err != nil {
+			return nil, err
+		}
+
+		fileHeader, err := c.FormFile("file")
+		if err != nil {
+			return nil, statusw.InvalidReqParam.WithCustomMessage("No file uploaded")
+		}
+
+		path := c.FormValue("path")
+		if path == "" {
+			path = fileHeader.Filename
+		}
+
+		src, err := fileHeader.Open()
+		if err != nil {
+			return nil, statusw.InvalidReqParam.WithCustomMessage("Failed to read uploaded file")
+		}
+		defer src.Close()
+
+		data, err := io.ReadAll(src)
+		if err != nil {
+			return nil, statusw.InvalidReqParam.WithCustomMessage("Failed to read uploaded file")
+		}
+
+		mimeType := fileHeader.Header.Get("Content-Type")
+		if mimeType == "" {
+			mimeType = "application/octet-stream"
+		}
+
+		result, err := appFileUC.Upload(c.Request().Context(), pid, c.Param("appId"), path, data, mimeType, fileHeader.Size)
+		if err != nil {
+			return nil, err
+		}
+		return responsew.Success(result, "File uploaded"), nil
+	}
+}
+
+func downloadAppFile(appFileUC appfile.UseCase, projectUC project.UseCase) func(c *echo.Context) error {
+	return func(c *echo.Context) error {
+		pid, err := validateProjectOwnership(c, projectUC)
+		if err != nil {
+			return err
+		}
+
+		fileID, err := strconv.ParseUint(c.Param("fileId"), 10, 64)
+		if err != nil {
+			return statusw.InvalidReqParam.WithCustomMessage("Invalid file ID")
+		}
+
+		data, mimeType, err := appFileUC.Download(c.Request().Context(), pid, c.Param("appId"), uint(fileID))
+		if err != nil {
+			return err
+		}
+
+		c.Response().Header().Set("Content-Type", mimeType)
+		c.Response().Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filepath.Base(c.Request().URL.Path)))
+		c.Response().WriteHeader(http.StatusOK)
+		c.Response().Write(data)
+		return nil
 	}
 }

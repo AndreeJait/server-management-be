@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AndreeJait/server-management-be/config"
 	"github.com/AndreeJait/server-management-be/domain/entity"
 	domainError "github.com/AndreeJait/server-management-be/domain/error"
 	"github.com/AndreeJait/server-management-be/port/inbound/proxy"
@@ -26,7 +27,7 @@ type proxyUseCase struct {
 	filesystem     outbound.Filesystem
 	proxyEngine    outbound.ProxyEngine
 	executor       PipelineExecutor
-	shiftInterval  time.Duration
+	runtimeCfg     *config.RuntimeConfig
 }
 
 func NewProxyUseCase(
@@ -40,13 +41,8 @@ func NewProxyUseCase(
 	appFileRepo outbound.AppFileRepository,
 	filesystem outbound.Filesystem,
 	proxyEngine outbound.ProxyEngine,
-	shiftIntervalSec int,
-	dockerNetwork string,
-	hostBase string,
+	runtimeCfg *config.RuntimeConfig,
 ) proxy.UseCase {
-	if shiftIntervalSec <= 0 {
-		shiftIntervalSec = 30
-	}
 	uc := &proxyUseCase{
 		proxyStateRepo: proxyStateRepo,
 		appRepo:        appRepo,
@@ -58,7 +54,7 @@ func NewProxyUseCase(
 		appFileRepo:    appFileRepo,
 		filesystem:     filesystem,
 		proxyEngine:    proxyEngine,
-		shiftInterval:  time.Duration(shiftIntervalSec) * time.Second,
+		runtimeCfg:     runtimeCfg,
 	}
 	uc.executor = PipelineExecutor{
 		DockerEngine:  dockerEngine,
@@ -66,8 +62,8 @@ func NewProxyUseCase(
 		Filesystem:    filesystem,
 		StepRepo:      stepRepo,
 		DeployRepo:    deployRepo,
-		DockerNetwork: dockerNetwork,
-		HostBase:      hostBase,
+		DockerNetwork: runtimeCfg.GetDockerNetwork(),
+		HostBase:      runtimeCfg.GetDockerHostBase(),
 	}
 	return uc
 }
@@ -199,7 +195,11 @@ func (u *proxyUseCase) executeTrafficShift(ctx context.Context, ps *entity.Proxy
 	shiftSteps := []int{25, 50, 75, 100}
 
 	for _, percent := range shiftSteps {
-		time.Sleep(u.shiftInterval)
+		shiftInterval := u.runtimeCfg.GetShiftIntervalSec()
+		if shiftInterval <= 0 {
+			shiftInterval = 30
+		}
+		time.Sleep(time.Duration(shiftInterval) * time.Second)
 
 		containerID := ps.GetSlotContainerID(targetSlot)
 		if containerID == "" {
