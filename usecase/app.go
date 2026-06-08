@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/AndreeJait/server-management-be/config"
 	"github.com/AndreeJait/server-management-be/domain/entity"
 	domainError "github.com/AndreeJait/server-management-be/domain/error"
 	"github.com/AndreeJait/server-management-be/port/inbound/app"
@@ -26,7 +27,7 @@ type appUseCase struct {
 	filesystem    outbound.Filesystem
 	cf            outbound.Cloudflare
 	proxyEngine   outbound.ProxyEngine
-	hostBase      string
+	runtimeCfg    *config.RuntimeConfig
 }
 
 func NewAppUseCase(
@@ -41,7 +42,7 @@ func NewAppUseCase(
 	filesystem outbound.Filesystem,
 	cf outbound.Cloudflare,
 	proxyEngine outbound.ProxyEngine,
-	hostBase string,
+	runtimeCfg *config.RuntimeConfig,
 ) app.UseCase {
 	return &appUseCase{
 		appRepo:       appRepo,
@@ -55,7 +56,7 @@ func NewAppUseCase(
 		filesystem:    filesystem,
 		cf:            cf,
 		proxyEngine:  proxyEngine,
-		hostBase:     hostBase,
+		runtimeCfg:   runtimeCfg,
 	}
 }
 
@@ -94,7 +95,7 @@ func (u *appUseCase) List(ctx context.Context, projectID uint) ([]*entity.AppRes
 	responses := make([]*entity.AppResponse, 0, len(apps))
 	for _, a := range apps {
 		resp := a.ToResponse()
-		resp.DockerHostBase = u.hostBase
+		resp.DockerHostBase = u.runtimeCfg.GetDockerHostBase()
 		responses = append(responses, resp)
 	}
 	return responses, nil
@@ -113,7 +114,7 @@ func (u *appUseCase) Get(ctx context.Context, projectID uint, appID string) (*en
 		return nil, domainError.ErrForbidden.WithCustomMessage("App does not belong to this project")
 	}
 	resp := a.ToResponse()
-	resp.DockerHostBase = u.hostBase
+	resp.DockerHostBase = u.runtimeCfg.GetDockerHostBase()
 	return resp, nil
 }
 
@@ -152,7 +153,7 @@ func (u *appUseCase) Update(ctx context.Context, projectID uint, appID string, n
 		return nil, domainError.ErrInternalServer.WithError(err)
 	}
 	resp := a.ToResponse()
-	resp.DockerHostBase = u.hostBase
+	resp.DockerHostBase = u.runtimeCfg.GetDockerHostBase()
 	return resp, nil
 }
 
@@ -219,9 +220,10 @@ func (u *appUseCase) Delete(ctx context.Context, projectID uint, appID string) e
 	_ = u.appFileRepo.DeleteByAppID(ctx, appIDStr)
 
 	// 8. Remove filesystem directories
-	basePath := a.BasePath
+	// Runtime config takes priority over stale BasePath in DB
+	basePath := u.runtimeCfg.GetDockerHostBase()
 	if basePath == "" {
-		basePath = u.hostBase
+		basePath = a.BasePath
 	}
 	_ = u.filesystem.RemoveAll(fmt.Sprintf("%s/%s/files", basePath, appIDStr))
 	_ = u.filesystem.RemoveAll(fmt.Sprintf("%s/%s", basePath, appIDStr))

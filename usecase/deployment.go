@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/AndreeJait/server-management-be/config"
 	"github.com/AndreeJait/server-management-be/domain/entity"
 	domainError "github.com/AndreeJait/server-management-be/domain/error"
 	"github.com/AndreeJait/server-management-be/port/inbound/deployment"
@@ -29,6 +30,7 @@ type deploymentUseCase struct {
 	bindingRepo  outbound.AppBindingRepository
 	proxyUC      proxyInbound.UseCase
 	executor     PipelineExecutor
+	runtimeCfg   *config.RuntimeConfig
 }
 
 func NewDeploymentUseCase(
@@ -42,8 +44,7 @@ func NewDeploymentUseCase(
 	filesystem outbound.Filesystem,
 	bindingRepo outbound.AppBindingRepository,
 	proxyUC proxyInbound.UseCase,
-	dockerNetwork string,
-	hostBase string,
+	runtimeCfg *config.RuntimeConfig,
 ) deployment.UseCase {
 	uc := &deploymentUseCase{
 		appRepo:      appRepo,
@@ -56,6 +57,7 @@ func NewDeploymentUseCase(
 		filesystem:   filesystem,
 		bindingRepo:  bindingRepo,
 		proxyUC:      proxyUC,
+		runtimeCfg:   runtimeCfg,
 	}
 	uc.executor = PipelineExecutor{
 		DockerEngine:  dockerEngine,
@@ -63,8 +65,8 @@ func NewDeploymentUseCase(
 		Filesystem:    filesystem,
 		StepRepo:      stepRepo,
 		DeployRepo:    deployRepo,
-		DockerNetwork: dockerNetwork,
-		HostBase:      hostBase,
+		DockerNetwork: runtimeCfg.GetDockerNetwork(),
+		HostBase:      runtimeCfg.GetDockerHostBase(),
 	}
 	return uc
 }
@@ -103,7 +105,7 @@ func (u *deploymentUseCase) Deploy(ctx context.Context, appID, deployToken, imag
 
 	template := entity.DefaultPipelineTemplate(app.FrameworkPreset)
 	template = MergeAppConfig(template, app)
-	template = MergeAppFiles(template, app, u.executor.HostBase)
+	template = MergeAppFiles(template, app, u.runtimeCfg.GetDockerHostBase())
 	steps := make([]*entity.PipelineStep, 0, len(template.Steps))
 	for _, def := range template.Steps {
 		steps = append(steps, entity.NewPipelineStep(d.ID, def.Name, def.Order, def.Config))
@@ -151,7 +153,7 @@ func (u *deploymentUseCase) DeployApp(ctx context.Context, appID, image string) 
 
 	template := entity.DefaultPipelineTemplate(app.FrameworkPreset)
 	template = MergeAppConfig(template, app)
-	template = MergeAppFiles(template, app, u.executor.HostBase)
+	template = MergeAppFiles(template, app, u.runtimeCfg.GetDockerHostBase())
 	steps := make([]*entity.PipelineStep, 0, len(template.Steps))
 	for _, def := range template.Steps {
 		steps = append(steps, entity.NewPipelineStep(d.ID, def.Name, def.Order, def.Config))
@@ -360,7 +362,7 @@ func (u *deploymentUseCase) mergeAppConfig(template *entity.PipelineTemplateDefi
 }
 
 func (u *deploymentUseCase) mergeAppFiles(template *entity.PipelineTemplateDefinition, app *entity.App) *entity.PipelineTemplateDefinition {
-	return MergeAppFiles(template, app, u.executor.HostBase)
+	return MergeAppFiles(template, app, u.runtimeCfg.GetDockerHostBase())
 }
 
 func mergeEnvVarsIntoConfig(configJSON string, envVars entity.StringMap) string {

@@ -120,7 +120,7 @@ func newAppUseCase(
 	proxyEngine portOutbound.ProxyEngine,
 	runtimeCfg *config.RuntimeConfig,
 ) app.UseCase {
-	return usecase.NewAppUseCase(appRepo, projectRepo, deployRepo, stepRepo, bindingRepo, appFileRepo, proxyStateRepo, dockerEngine, filesystem, cf, proxyEngine, runtimeCfg.GetDockerHostBase())
+	return usecase.NewAppUseCase(appRepo, projectRepo, deployRepo, stepRepo, bindingRepo, appFileRepo, proxyStateRepo, dockerEngine, filesystem, cf, proxyEngine, runtimeCfg)
 }
 
 func newRegistryUseCase(credRepo portOutbound.RegistryCredentialRepository) registry.UseCase {
@@ -148,7 +148,7 @@ func newDeploymentUseCase(
 	proxyUC proxyInbound.UseCase,
 	runtimeCfg *config.RuntimeConfig,
 ) deployment.UseCase {
-	return usecase.NewDeploymentUseCase(appRepo, projectRepo, deployRepo, stepRepo, credRepo, dockerEngine, appFileRepo, filesystem, bindingRepo, proxyUC, runtimeCfg.GetDockerNetwork(), runtimeCfg.GetDockerHostBase())
+	return usecase.NewDeploymentUseCase(appRepo, projectRepo, deployRepo, stepRepo, credRepo, dockerEngine, appFileRepo, filesystem, bindingRepo, proxyUC, runtimeCfg)
 }
 
 func newAppFileRepository(db *outbound.DB) portOutbound.AppFileRepository {
@@ -160,7 +160,7 @@ func newFilesystem() portOutbound.Filesystem {
 }
 
 func newAppFileUseCase(appFileRepo portOutbound.AppFileRepository, appRepo portOutbound.AppRepository, deployRepo portOutbound.DeploymentRepository, filesystem portOutbound.Filesystem, runtimeCfg *config.RuntimeConfig) appfile.UseCase {
-	uc := usecase.NewAppFileUseCase(appFileRepo, appRepo, deployRepo, filesystem, runtimeCfg.GetDockerHostBase())
+	uc := usecase.NewAppFileUseCase(appFileRepo, appRepo, deployRepo, filesystem, runtimeCfg)
 	return uc
 }
 

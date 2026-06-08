@@ -96,7 +96,7 @@ type AppResponse struct {
 	PostDeployCommands  StringList      `json:"post_deploy_commands,omitempty"`
 	BasePath            string          `json:"base_path,omitempty"`
 	FilesMountPath      string          `json:"files_mount_path,omitempty"`
-	DockerHostBase      string          `json:"docker_host_base,omitempty"`
+	DockerHostBase      string          `json:"docker_host_base"`
 	CreatedAt           string          `json:"created_at"`
 }
 

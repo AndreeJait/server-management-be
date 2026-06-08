@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/AndreeJait/server-management-be/config"
 	"github.com/AndreeJait/server-management-be/domain/entity"
 	domainError "github.com/AndreeJait/server-management-be/domain/error"
 	"github.com/AndreeJait/server-management-be/port/inbound/appfile"
@@ -20,11 +21,11 @@ type appFileUseCase struct {
 	deployRepo  outbound.DeploymentRepository
 	filesystem  outbound.Filesystem
 	deployFunc  appfile.DeployFunc
-	hostBase    string
+	runtimeCfg  *config.RuntimeConfig
 }
 
-func NewAppFileUseCase(appFileRepo outbound.AppFileRepository, appRepo outbound.AppRepository, deployRepo outbound.DeploymentRepository, filesystem outbound.Filesystem, hostBase string) appfile.UseCase {
-	return &appFileUseCase{appFileRepo: appFileRepo, appRepo: appRepo, deployRepo: deployRepo, filesystem: filesystem, hostBase: hostBase}
+func NewAppFileUseCase(appFileRepo outbound.AppFileRepository, appRepo outbound.AppRepository, deployRepo outbound.DeploymentRepository, filesystem outbound.Filesystem, runtimeCfg *config.RuntimeConfig) appfile.UseCase {
+	return &appFileUseCase{appFileRepo: appFileRepo, appRepo: appRepo, deployRepo: deployRepo, filesystem: filesystem, runtimeCfg: runtimeCfg}
 }
 
 func (u *appFileUseCase) SetDeployFunc(fn appfile.DeployFunc) {
@@ -32,10 +33,13 @@ func (u *appFileUseCase) SetDeployFunc(fn appfile.DeployFunc) {
 }
 
 func (u *appFileUseCase) effectiveHostBase(app *entity.App) string {
-	if app.BasePath != "" {
-		return app.BasePath
+	// Runtime config (docker.host_base) takes priority — it's the live value.
+	// app.BasePath is only used as a fallback if runtime config is empty.
+	hostBase := u.runtimeCfg.GetDockerHostBase()
+	if hostBase != "" {
+		return hostBase
 	}
-	return u.hostBase
+	return app.BasePath
 }
 
 func (u *appFileUseCase) validateOwnership(ctx context.Context, projectID uint, appID string) (*entity.App, error) {
@@ -286,7 +290,9 @@ func (u *appFileUseCase) CreateFolder(ctx context.Context, projectID uint, appID
 		return nil, domainError.ErrInternalServer.WithError(err)
 	}
 
-	return app.ToResponse(), nil
+	resp := app.ToResponse()
+	resp.DockerHostBase = u.runtimeCfg.GetDockerHostBase()
+	return resp, nil
 }
 
 func (u *appFileUseCase) DeleteFolder(ctx context.Context, projectID uint, appID, path string) error {
