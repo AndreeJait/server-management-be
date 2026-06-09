@@ -22,6 +22,7 @@ import (
 	"github.com/AndreeJait/server-management-be/port/inbound/project"
 	"github.com/AndreeJait/server-management-be/port/inbound/registry"
 	"github.com/AndreeJait/server-management-be/port/inbound/role"
+	sshInbound "github.com/AndreeJait/server-management-be/port/inbound/ssh"
 	"github.com/AndreeJait/server-management-be/port/inbound/user"
 	portOutbound "github.com/AndreeJait/server-management-be/port/outbound"
 	"github.com/AndreeJait/go-utility/v2/authw"
@@ -54,6 +55,7 @@ func newRouter(
 	bindingUC bindingInbound.UseCase,
 	proxyUC proxyInbound.UseCase,
 	configUC configInbound.UseCase,
+	sshUC sshInbound.UseCase,
 	authenticator authw.Authenticator,
 	rbac *authw.RBAC,
 	proxyEngine portOutbound.ProxyEngine,
@@ -130,7 +132,7 @@ func newRouter(
 		AllowCredentials: allowCredentials,
 	}))
 
-	echoAdapter.RegisterRoutes(e, healthUC, authUC, userUC, roleUC, projectUC, appUC, registryUC, deployUC, appFileUC, cfUC, bindingUC, proxyUC, configUC, authenticator, rbac)
+	echoAdapter.RegisterRoutes(e, healthUC, authUC, userUC, roleUC, projectUC, appUC, registryUC, deployUC, appFileUC, cfUC, bindingUC, proxyUC, configUC, sshUC, authenticator, rbac)
 
 	return e, nil
 }

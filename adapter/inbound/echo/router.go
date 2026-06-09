@@ -16,6 +16,7 @@ import (
 	"github.com/AndreeJait/server-management-be/port/inbound/project"
 	"github.com/AndreeJait/server-management-be/port/inbound/registry"
 	"github.com/AndreeJait/server-management-be/port/inbound/role"
+	sshInbound "github.com/AndreeJait/server-management-be/port/inbound/ssh"
 	"github.com/AndreeJait/server-management-be/port/inbound/user"
 	"github.com/AndreeJait/go-utility/v2/authw"
 	httpw "github.com/AndreeJait/go-utility/v2/httpw/echow"
@@ -45,6 +46,7 @@ func RegisterRoutes(
 	bindingUC bindingUC.UseCase,
 	proxyUC proxyUC.UseCase,
 	configUC configUC.UseCase,
+	sshUC sshInbound.UseCase,
 	authenticator authw.Authenticator,
 	rbac *authw.RBAC,
 ) {
@@ -59,6 +61,11 @@ func RegisterRoutes(
 	// Terminal (WebSocket) — authenticates via query param token, not header
 	e.GET("/projects/:id/apps/:appId/terminal", echo.WrapHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		terminalHandler(deployUC, appUC, authenticator, rbac)(w, r)
+	})))
+
+	// SSH terminal (WebSocket) — authenticates via query param token, not header
+	e.GET("/ssh/hosts/:hostId/terminal", echo.WrapHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sshTerminalHandler(sshUC, authenticator, rbac)(w, r)
 	})))
 
 	// Protected routes — auth middleware applied at group level
@@ -165,4 +172,15 @@ func RegisterRoutes(
 	admin.GET("/registry-credentials", httpw.Bind(listGlobalRegistryCredentials(registryUC)))
 	admin.PUT("/registry-credentials/:id", httpw.Bind(updateAdminRegistryCredential(registryUC)))
 	admin.DELETE("/registry-credentials/:id", httpw.Bind(deleteAdminRegistryCredential(registryUC)))
+
+	// SSH routes — read (ssh:read)
+	sshRead := protected.Group("/ssh", rbacMiddleware(rbac, "ssh:read"))
+	sshRead.GET("/hosts", httpw.Bind(listSSHHosts(sshUC)))
+	sshRead.GET("/hosts/:hostId", httpw.Bind(getSSHHost(sshUC)))
+
+	// SSH routes — write (ssh:write)
+	sshWrite := protected.Group("/ssh", rbacMiddleware(rbac, "ssh:write"))
+	sshWrite.POST("/hosts", httpw.Bind(createSSHHost(sshUC)))
+	sshWrite.PUT("/hosts/:hostId", httpw.Bind(updateSSHHost(sshUC)))
+	sshWrite.DELETE("/hosts/:hostId", httpw.Bind(deleteSSHHost(sshUC)))
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/AndreeJait/server-management-be/port/inbound/project"
 	"github.com/AndreeJait/server-management-be/port/inbound/registry"
 	"github.com/AndreeJait/server-management-be/port/inbound/role"
+	sshInbound "github.com/AndreeJait/server-management-be/port/inbound/ssh"
 	"github.com/AndreeJait/server-management-be/port/inbound/user"
 	portOutbound "github.com/AndreeJait/server-management-be/port/outbound"
 	"github.com/AndreeJait/server-management-be/usecase"
@@ -59,6 +60,9 @@ func provideServices(c *dig.Container) {
 	c.Provide(newSettingRepository)
 	c.Provide(newDomainRequestCountRepository)
 	c.Provide(newConfigUseCase)
+	c.Provide(newSSHHostRepository)
+	c.Provide(newSSHClient)
+	c.Provide(newSSHUseCase)
 	// kyan:provider:end
 }
 
@@ -250,4 +254,15 @@ func newConfigUseCase(settingRepo portOutbound.SettingRepository, domainCountRep
 }
 
 // kyan:service:start
+func newSSHHostRepository(db *outbound.DB) portOutbound.SSHHostRepository {
+	return outbound.NewSSHHostRepository(db)
+}
+
+func newSSHClient() portOutbound.SSHClient {
+	return outbound.NewSSHClient()
+}
+
+func newSSHUseCase(hostRepo portOutbound.SSHHostRepository, sshClient portOutbound.SSHClient) sshInbound.UseCase {
+	return usecase.NewSSHUseCase(hostRepo, sshClient)
+}
 // kyan:service:end

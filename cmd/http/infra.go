@@ -160,6 +160,7 @@ func registerDefaultRoles(rbac *authw.RBAC) {
 		"configs:read", "configs:write",
 		"cloudflare:read", "cloudflare:write",
 		"proxy:read", "proxy:write",
+		"ssh:read", "ssh:write", "ssh:connect",
 	)
 	rbac.RegisterRole("operator",
 		"users:read",
@@ -168,6 +169,7 @@ func registerDefaultRoles(rbac *authw.RBAC) {
 		"configs:read", "configs:write",
 		"cloudflare:read", "cloudflare:write",
 		"proxy:read",
+		"ssh:read", "ssh:write", "ssh:connect",
 	)
 	rbac.RegisterRole("viewer",
 		"users:read",
@@ -176,6 +178,7 @@ func registerDefaultRoles(rbac *authw.RBAC) {
 		"configs:read",
 		"cloudflare:read",
 		"proxy:read",
+		"ssh:read",
 	)
 }
 
