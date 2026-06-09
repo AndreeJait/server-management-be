@@ -1,0 +1,1 @@
+DELETE FROM role_permissions WHERE permission IN ('ssh:read', 'ssh:write', 'ssh:connect');
